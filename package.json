@@ -1,6 +1,29 @@
 {
   "name": "llm-gateway",
-  "description": "One-shot CLIProxyAPI on Cloudflare: your subscription logins as an API from a Worker and a Container, state in R2.",
+  "description": "Deploy CLIProxyAPI (CPA) to Cloudflare in one click: your Claude, Codex and Gemini subscriptions as a private API, on Workers and Containers with state in R2.",
+  "license": "MIT",
+  "homepage": "https://github.com/PlaygrndLabs/llm-gateway#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PlaygrndLabs/llm-gateway.git"
+  },
+  "bugs": {
+    "url": "https://github.com/PlaygrndLabs/llm-gateway/issues"
+  },
+  "keywords": [
+    "cliproxyapi",
+    "cpa",
+    "cloudflare-workers",
+    "cloudflare-containers",
+    "claude-code",
+    "llm-gateway",
+    "ai-gateway",
+    "openai-compatible",
+    "anthropic",
+    "codex",
+    "gemini",
+    "self-hosted"
+  ],
   "private": true,
   "type": "module",
   "scripts": {
