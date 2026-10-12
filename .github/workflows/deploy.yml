@@ -49,4 +49,4 @@ jobs:
             npx wrangler r2 bucket create llm-gateway
           fi
       - if: steps.creds.outputs.ready == 'true'
-        run: npx wrangler deploy --var "R2_ENDPOINT:https://${CLOUDFLARE_ACCOUNT_ID}.r2.cloudflarestorage.com"
+        run: npx wrangler deploy

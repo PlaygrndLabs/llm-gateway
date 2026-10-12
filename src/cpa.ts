@@ -1,5 +1,9 @@
 import { Container } from "@cloudflare/containers";
 import type { Env } from "./env.ts";
+import { handleS3 } from "./s3.ts";
+
+export const STATE_HOST = "r2.internal";
+export const STATE_BUCKET = "state";
 
 export class Cpa extends Container<Env> {
   override defaultPort = 8317;
@@ -8,12 +12,16 @@ export class Cpa extends Container<Env> {
   constructor(ctx: ConstructorParameters<typeof Container>[0], env: Env) {
     super(ctx, env);
     this.envVars = {
-      OBJECTSTORE_ENDPOINT: env.R2_ENDPOINT,
-      OBJECTSTORE_BUCKET: env.R2_BUCKET,
-      OBJECTSTORE_ACCESS_KEY: env.R2_ACCESS_KEY_ID,
-      OBJECTSTORE_SECRET_KEY: env.R2_SECRET_ACCESS_KEY,
+      OBJECTSTORE_ENDPOINT: `http://${STATE_HOST}`,
+      OBJECTSTORE_BUCKET: STATE_BUCKET,
+      OBJECTSTORE_ACCESS_KEY: "r2-binding",
+      OBJECTSTORE_SECRET_KEY: "r2-binding",
       CPA_MANAGEMENT_KEY: env.MANAGEMENT_KEY,
       CPA_CLIENT_KEY: env.CLIENT_API_KEY,
     };
   }
 }
+
+Cpa.outboundByHost = {
+  [STATE_HOST]: (request, env) => handleS3(request, (env as Env).STATE, STATE_BUCKET),
+};

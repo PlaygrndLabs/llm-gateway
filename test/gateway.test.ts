@@ -153,6 +153,19 @@ describe("handle", () => {
     expect(await response.text()).toContain("Wrong password.");
   });
 
+  it("turns sign-in off while the dashboard password is missing or short", async () => {
+    const { forward } = recorder();
+    const weak = { dashboardPassword: "short", nowSeconds: () => NOW };
+    const form = await handle(at("/login"), weak, forward);
+    expect(await form.text()).toContain("Sign-in is off");
+    const attempt = await handle(at("/login", { method: "POST", body: new URLSearchParams({ password: "short" }) }), weak, forward);
+    expect(attempt.status).toBe(503);
+    expect(attempt.headers.get("set-cookie")).toBeNull();
+    const forgedWithKnownPassword = `${SESSION_COOKIE}=${await issueSession("short", NOW)}`;
+    const dashboard = await handle(at("/v8/management/config", { headers: { cookie: forgedWithKnownPassword } }), weak, forward);
+    expect(dashboard.status).toBe(401);
+  });
+
   it("sends the home page to login or the dashboard", async () => {
     const { forward } = recorder();
     expect((await handle(at("/"), config, forward)).headers.get("location")).toBe("/login");

@@ -10,6 +10,8 @@ export interface GatewayConfig {
 }
 
 const MAX_LOGIN_BODY = 4096;
+export const MIN_PASSWORD_LENGTH = 16;
+const PASSWORD_NOT_SET = `Sign-in is off: set the DASHBOARD_PASSWORD secret to at least ${MIN_PASSWORD_LENGTH} characters.`;
 
 function redirect(location: string, headers: HeadersInit = {}): Response {
   return new Response(null, { status: 303, headers: { location, "cache-control": "no-store", ...headers } });
@@ -38,11 +40,13 @@ function withoutCookies(request: Request): Request {
 }
 
 async function signedIn(request: Request, config: GatewayConfig): Promise<boolean> {
+  if (config.dashboardPassword.length < MIN_PASSWORD_LENGTH) return false;
   const token = readCookie(request.headers.get("cookie"), SESSION_COOKIE);
   return token !== null && (await sessionIsValid(config.dashboardPassword, token, config.nowSeconds()));
 }
 
 async function login(request: Request, config: GatewayConfig): Promise<Response> {
+  if (config.dashboardPassword.length < MIN_PASSWORD_LENGTH) return html(loginPage(PASSWORD_NOT_SET), 503);
   const length = Number(request.headers.get("content-length") ?? "0");
   if (!Number.isFinite(length) || length > MAX_LOGIN_BODY) return html(loginPage("Request too large."), 413);
   const form = await request.formData().catch(() => null);
@@ -65,7 +69,9 @@ export async function handle(request: Request, config: GatewayConfig, forward: F
       return redirect((await signedIn(request, config)) ? "/management.html" : "/login");
     case "login":
       if (request.method === "POST") return login(request, config);
-      if (request.method === "GET") return html(loginPage(null));
+      if (request.method === "GET") {
+        return html(loginPage(config.dashboardPassword.length < MIN_PASSWORD_LENGTH ? PASSWORD_NOT_SET : null));
+      }
       return notFound();
     case "logout":
       return redirect("/login", { "set-cookie": `${SESSION_COOKIE}=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0` });

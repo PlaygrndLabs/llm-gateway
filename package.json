@@ -1,10 +1,11 @@
 {
   "name": "llm-gateway",
+  "description": "One-shot CLIProxyAPI on Cloudflare: your subscription logins as an API from a Worker and a Container, state in R2.",
   "private": true,
   "type": "module",
   "scripts": {
-    "types": "wrangler types",
-    "typecheck": "tsc",
+    "types": "wrangler types --include-env=false",
+    "typecheck": "tsc && tsc -p tsconfig.node.json",
     "lint": "eslint .",
     "test": "vitest run",
     "verify": "npm run typecheck && npm run lint && npm test",
@@ -15,10 +16,24 @@
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
+    "@types/node": "22.20.5",
     "eslint": "10.12.0",
     "typescript": "6.0.3",
     "typescript-eslint": "8.71.1",
     "vitest": "5.0.4",
     "wrangler": "4.149.0"
+  },
+  "cloudflare": {
+    "bindings": {
+      "DASHBOARD_PASSWORD": {
+        "description": "Password for the dashboard sign-in at /login. Use a long random string, for example `openssl rand -base64 30`."
+      },
+      "MANAGEMENT_KEY": {
+        "description": "CPA management key, asked for inside the dashboard. At least 32 characters of A-Z a-z 0-9 _ -, for example `openssl rand -hex 32`. Used on first start only; change it in the dashboard afterwards."
+      },
+      "CLIENT_API_KEY": {
+        "description": "First API key your apps send as x-api-key or Bearer. At least 32 characters of A-Z a-z 0-9 _ -, for example `openssl rand -hex 32`. Add more keys in the dashboard."
+      }
+    }
   }
 }
