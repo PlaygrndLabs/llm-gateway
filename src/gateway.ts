@@ -1,7 +1,7 @@
 import { keyIsAllowed } from "./client-keys.ts";
 import { classify } from "./routes.ts";
 import { SESSION_COOKIE, SESSION_SECONDS, issueSession, passwordMatches, readCookie, sessionIsValid } from "./session.ts";
-import { loginPage } from "./login-page.ts";
+import { loginPage, messagePage } from "./login-page.ts";
 
 export type Forward = (request: Request) => Promise<Response>;
 
@@ -57,6 +57,21 @@ async function signedIn(request: Request, config: GatewayConfig): Promise<boolea
   return token !== null && (await sessionIsValid(config.dashboardPassword, token, config.nowSeconds()));
 }
 
+async function oauthCallback(request: Request, url: URL, config: GatewayConfig, forward: Forward): Promise<Response> {
+  if (request.method !== "GET") return notFound();
+  if (!(await signedIn(request, config))) {
+    return html(messagePage("Sign in first", "Sign in to the dashboard, then open this address again.", true), 401);
+  }
+  const target = new URL(`/v0/management/oauth-callback${url.search}`, url);
+  const response = await forward(new Request(target));
+  if (response.ok) {
+    return html(messagePage("Login received", "CPA is saving this login. Go back to the dashboard to see it.", false));
+  }
+  const body: unknown = await response.json().catch(() => null);
+  const reason = typeof body === "object" && body !== null && "error" in body && typeof body.error === "string" ? body.error : `CPA answered ${response.status}`;
+  return html(messagePage("Login not saved", `${reason}. Start the login again from the dashboard.`, true), response.status);
+}
+
 async function login(request: Request, config: GatewayConfig): Promise<Response> {
   if (config.dashboardPassword.length < MIN_PASSWORD_LENGTH) return html(loginPage(PASSWORD_NOT_SET), 503);
   const length = Number(request.headers.get("content-length") ?? "0");
@@ -79,6 +94,8 @@ export async function handle(request: Request, config: GatewayConfig, forward: F
       return api(request, config, forward);
     case "health":
       return forward(withoutCookies(request));
+    case "oauth-callback":
+      return oauthCallback(request, url, config, forward);
     case "home":
       return redirect((await signedIn(request, config)) ? "/management.html" : "/login");
     case "login":

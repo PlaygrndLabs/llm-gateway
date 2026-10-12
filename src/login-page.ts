@@ -4,6 +4,24 @@ function escapeHtml(text: string): string {
 
 export function loginPage(error: string | null): string {
   const message = error === null ? "" : `<p class="error">${escapeHtml(error)}</p>`;
+  return page(`<form method="post" action="/login">
+  <h1>LLM Gateway</h1>
+  <p>Sign in to open the CPA dashboard.</p>
+  ${message}
+  <input type="password" name="password" autocomplete="current-password" placeholder="Dashboard password" required autofocus>
+  <button type="submit">Sign in</button>
+</form>`);
+}
+
+export function messagePage(title: string, text: string, failed: boolean): string {
+  return page(`<form method="get" action="/management.html">
+  <h1>${escapeHtml(title)}</h1>
+  <p${failed ? ' class="error"' : ""}>${escapeHtml(text)}</p>
+  <button type="submit">Open the dashboard</button>
+</form>`);
+}
+
+function page(content: string): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -24,13 +42,7 @@ export function loginPage(error: string | null): string {
 </style>
 </head>
 <body>
-<form method="post" action="/login">
-  <h1>LLM Gateway</h1>
-  <p>Sign in to open the CPA dashboard.</p>
-  ${message}
-  <input type="password" name="password" autocomplete="current-password" placeholder="Dashboard password" required autofocus>
-  <button type="submit">Sign in</button>
-</form>
+${content}
 </body>
 </html>
 `;

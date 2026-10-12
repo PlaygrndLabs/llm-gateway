@@ -32,7 +32,7 @@ You need a Cloudflare account on the Workers Paid plan ($5 a month; Containers r
 
 1. Open your gateway, sign in with the dashboard password, then enter the management key.
 2. Under OAuth login, choose the provider (for Claude: Anthropic) and open the link it gives you.
-3. Sign in with that provider. The browser then lands on a `localhost` address that does not load; that is expected. Copy the whole address from the address bar and paste it into the dashboard's callback field.
+3. Sign in with that provider. The browser then lands on a `localhost` address that does not load; that is expected, since each provider only returns to the address registered for its login. Copy the whole address from the address bar (it carries `code` and `state`) and paste it into the dashboard's Callback URL field. Or, in the same browser where you are signed in to the gateway, replace `http://localhost:<port>` with your gateway address and open it: the gateway hands the callback to CPA.
 
 CPA saves the login to R2 and refreshes its tokens itself.
 

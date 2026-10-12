@@ -42,7 +42,9 @@ describe("classify", () => {
     ["/logout", "logout"],
     ["/anthropic/callback", "blocked"],
     ["/codex/callback", "blocked"],
-    ["/callback", "blocked"],
+    ["/callback", "oauth-callback"],
+    ["/auth/callback", "oauth-callback"],
+    ["/oauth-callback", "oauth-callback"],
     ["/v1", "blocked"],
     ["/v0/management", "blocked"],
     ["/v1/%2e%2e/v0/management/config", "blocked"],
@@ -139,9 +141,40 @@ describe("handle", () => {
     expect(seen).toHaveLength(1);
   });
 
+  it("hands a provider's callback to CPA for a signed-in user", async () => {
+    const { forward, seen } = recorder();
+    const response = await handle(
+      at("/callback?code=abc&state=f1d66a216e61aab0375b6857db64a6a5", { headers: { cookie: await sessionCookie() } }),
+      config,
+      forward,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.text()).toContain("Login received");
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.url).toBe("https://gateway.example/v0/management/oauth-callback?code=abc&state=f1d66a216e61aab0375b6857db64a6a5");
+    expect(seen[0]?.headers.get("cookie")).toBeNull();
+  });
+
+  it("keeps the callback closed without a session", async () => {
+    const { forward, seen } = recorder();
+    const response = await handle(at("/auth/callback?code=abc&state=xyz"), config, forward);
+    expect(response.status).toBe(401);
+    expect(await response.text()).toContain("Sign in");
+    expect(seen).toHaveLength(0);
+  });
+
+  it("explains a callback CPA refuses", async () => {
+    const refused: Forward = async () => Response.json({ status: "error", error: "unknown or expired state" }, { status: 404 });
+    const response = await handle(at("/oauth-callback?code=abc&state=xyz", { headers: { cookie: await sessionCookie() } }), config, refused);
+    expect(response.status).toBe(404);
+    const text = await response.text();
+    expect(text).toContain("unknown or expired state");
+    expect(text).toContain("Start the login again");
+  });
+
   it("never forwards blocked paths", async () => {
     const { forward, seen } = recorder();
-    for (const path of ["/anthropic/callback?code=x", "/codex/callback", "/robots.txt", "/v1"]) {
+    for (const path of ["/anthropic/callback?code=x", "/codex/callback", "/devin/callback", "/robots.txt", "/v1"]) {
       expect((await handle(at(path), config, forward)).status).toBe(404);
     }
     expect(seen).toHaveLength(0);
