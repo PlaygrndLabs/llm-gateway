@@ -17,7 +17,6 @@ export class Cpa extends Container<Env> {
       OBJECTSTORE_ACCESS_KEY: "r2-binding",
       OBJECTSTORE_SECRET_KEY: "r2-binding",
       CPA_MANAGEMENT_KEY: env.MANAGEMENT_KEY,
-      CPA_CLIENT_KEY: env.CLIENT_API_KEY,
     };
   }
 }

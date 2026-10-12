@@ -1,3 +1,2 @@
 DASHBOARD_PASSWORD=change-me-to-a-long-random-password
 MANAGEMENT_KEY=change-me-to-64-random-hex-characters-from-openssl-rand-hex-32
-CLIENT_API_KEY=change-me-to-64-random-hex-characters-from-openssl-rand-hex-32
