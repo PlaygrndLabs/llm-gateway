@@ -1,4 +1,4 @@
-import { keyIsAllowed } from "./client-keys.ts";
+import type { KeyGuard } from "./key-guard.ts";
 import { classify } from "./routes.ts";
 import { SESSION_COOKIE, SESSION_SECONDS, issueSession, passwordMatches, readCookie, sessionIsValid } from "./session.ts";
 import { loginPage, messagePage } from "./login-page.ts";
@@ -8,12 +8,13 @@ export type Forward = (request: Request) => Promise<Response>;
 export interface GatewayConfig {
   readonly dashboardPassword: string;
   readonly nowSeconds: () => number;
-  readonly clientKeys: () => Promise<string[]>;
+  readonly keyGuard: KeyGuard;
 }
 
 const MAX_LOGIN_BODY = 4096;
 export const MIN_PASSWORD_LENGTH = 16;
 const NO_CLIENT_KEYS = "No API key is set up yet: add one under API Keys in the dashboard.";
+const CPA_UNAVAILABLE = "The gateway is starting or unavailable. Try again shortly.";
 const PASSWORD_NOT_SET = `Sign-in is off: set the DASHBOARD_PASSWORD secret to at least ${MIN_PASSWORD_LENGTH} characters.`;
 
 function redirect(location: string, headers: HeadersInit = {}): Response {
@@ -42,13 +43,25 @@ function withoutCookies(request: Request): Request {
   return new Request(request, { headers });
 }
 
-async function api(request: Request, config: GatewayConfig, forward: Forward): Promise<Response> {
-  const allowed = await config.clientKeys();
-  if (allowed.length === 0) return Response.json({ error: { type: "authentication_error", message: NO_CLIENT_KEYS } }, { status: 401 });
-  if (!(await keyIsAllowed(request, allowed))) {
-    return Response.json({ error: { type: "authentication_error", message: "Invalid API key." } }, { status: 401 });
+function apiError(status: number, type: string, message: string): Response {
+  return Response.json({ error: { type, message } }, { status, headers: { "cache-control": "no-store" } });
+}
+
+async function api(request: Request, url: URL, config: GatewayConfig, forward: Forward): Promise<Response> {
+  switch (await config.keyGuard.state(url.origin, forward)) {
+    case "open":
+      return apiError(401, "authentication_error", NO_CLIENT_KEYS);
+    case "unavailable":
+      return apiError(503, "api_error", CPA_UNAVAILABLE);
+    case "required":
+      return forward(withoutCookies(request));
   }
-  return forward(withoutCookies(request));
+}
+
+async function dashboard(request: Request, config: GatewayConfig, forward: Forward): Promise<Response> {
+  const response = await forward(withoutCookies(request));
+  if (request.method !== "GET" && request.method !== "HEAD") config.keyGuard.forget();
+  return response;
 }
 
 async function signedIn(request: Request, config: GatewayConfig): Promise<boolean> {
@@ -91,7 +104,7 @@ export async function handle(request: Request, config: GatewayConfig, forward: F
   const url = new URL(request.url);
   switch (classify(url.pathname)) {
     case "api":
-      return api(request, config, forward);
+      return api(request, url, config, forward);
     case "health":
       return forward(withoutCookies(request));
     case "oauth-callback":
@@ -107,7 +120,7 @@ export async function handle(request: Request, config: GatewayConfig, forward: F
     case "logout":
       return redirect("/login", { "set-cookie": `${SESSION_COOKIE}=; Path=/; Secure; HttpOnly; SameSite=Strict; Max-Age=0` });
     case "dashboard":
-      if (await signedIn(request, config)) return forward(withoutCookies(request));
+      if (await signedIn(request, config)) return dashboard(request, config, forward);
       if (request.method === "GET" && url.pathname === "/management.html") return redirect("/login");
       return Response.json({ error: "sign in at /login first" }, { status: 401 });
     case "blocked":

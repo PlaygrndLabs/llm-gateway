@@ -1,12 +1,39 @@
 import { describe, expect, it } from "vitest";
-import { handle, type Forward } from "../src/gateway.ts";
+import { handle, type Forward, type GatewayConfig } from "../src/gateway.ts";
+import { KeyGuard } from "../src/key-guard.ts";
 import { classify } from "../src/routes.ts";
 import { SESSION_COOKIE, issueSession, passwordMatches, readCookie, sessionIsValid } from "../src/session.ts";
 
 const PASSWORD = "correct-horse-battery-staple-0123456789";
 const NOW = 1_800_000_000;
 const CLIENT_KEY = "client-key-0123456789abcdef0123456789abcdef";
-const config = { dashboardPassword: PASSWORD, nowSeconds: () => NOW, clientKeys: async () => [CLIENT_KEY] };
+
+function freshConfig(nowSeconds: () => number = () => NOW): GatewayConfig {
+  return { dashboardPassword: PASSWORD, nowSeconds, keyGuard: new KeyGuard(nowSeconds) };
+}
+
+const config = freshConfig();
+
+function presentedKey(request: Request): string | null {
+  const authorization = request.headers.get("authorization");
+  return authorization?.replace(/^bearer\s+/i, "").trim() || request.headers.get("x-api-key") || new URL(request.url).searchParams.get("key");
+}
+
+function fakeCpa(keys: string[]): { forward: Forward; seen: Request[]; probes: Request[] } {
+  const seen: Request[] = [];
+  const probes: Request[] = [];
+  return {
+    seen,
+    probes,
+    forward: async (request) => {
+      const key = presentedKey(request);
+      if (key?.startsWith("probe-")) probes.push(request);
+      else seen.push(request);
+      if (keys.length > 0 && (key === null || !keys.includes(key))) return Response.json({ error: "Invalid API key" }, { status: 401 });
+      return new Response("from cpa", { status: 200 });
+    },
+  };
+}
 
 function recorder(): { forward: Forward; seen: Request[] } {
   const seen: Request[] = [];
@@ -89,55 +116,82 @@ describe("session", () => {
 });
 
 describe("handle", () => {
-  it("forwards API calls to CPA without the browser's cookies", async () => {
-    const { forward, seen } = recorder();
+  it("forwards API calls to CPA without the browser's cookies once CPA requires a key", async () => {
+    const { forward, seen, probes } = fakeCpa([CLIENT_KEY]);
     const response = await handle(
       at("/v1/messages", { method: "POST", headers: { "x-api-key": CLIENT_KEY, cookie: await sessionCookie() }, body: "{}" }),
-      config,
+      freshConfig(),
       forward,
     );
     expect(response.status).toBe(200);
+    expect(probes).toHaveLength(1);
+    expect(probes[0]?.url).toBe("https://gateway.example/v1/models");
     expect(seen).toHaveLength(1);
     expect(seen[0]?.headers.get("x-api-key")).toBe(CLIENT_KEY);
     expect(seen[0]?.headers.get("cookie")).toBeNull();
     expect(await seen[0]?.text()).toBe("{}");
   });
 
-  it("accepts the key wherever CPA reads it", async () => {
-    const { forward, seen } = recorder();
-    const requests = [
-      at("/v1/models", { headers: { authorization: `Bearer ${CLIENT_KEY}` } }),
-      at("/v1/models", { headers: { authorization: `bearer  ${CLIENT_KEY} ` } }),
-      at("/v1/models", { headers: { authorization: CLIENT_KEY } }),
-      at("/v1beta/models", { headers: { "x-goog-api-key": CLIENT_KEY } }),
-      at(`/v1beta/models?key=${CLIENT_KEY}`),
-      at(`/v1/models?auth_token=${CLIENT_KEY}`),
-    ];
-    for (const request of requests) expect((await handle(request, config, forward)).status).toBe(200);
-    expect(seen).toHaveLength(requests.length);
+  it("leaves checking the key to CPA", async () => {
+    const { forward, seen } = fakeCpa([CLIENT_KEY]);
+    const guarded = freshConfig();
+    expect((await handle(at("/v1/models", { headers: { "x-api-key": "guess" } }), guarded, forward)).status).toBe(401);
+    expect((await handle(at("/v1/models"), guarded, forward)).status).toBe(401);
+    expect((await handle(at(`/v1beta/models?key=${CLIENT_KEY}`), guarded, forward)).status).toBe(200);
+    expect(seen).toHaveLength(3);
   });
 
-  it("refuses API calls without a key the dashboard made", async () => {
-    const { forward, seen } = recorder();
-    expect((await handle(at("/v1/models"), config, forward)).status).toBe(401);
-    expect((await handle(at("/v1/models", { headers: { "x-api-key": "guess" } }), config, forward)).status).toBe(401);
-    expect((await handle(at("/v1/models", { headers: { authorization: "Basic abc" } }), config, forward)).status).toBe(401);
-    expect(seen).toHaveLength(0);
-  });
-
-  it("refuses every API call while the dashboard has no keys, which CPA alone would let through", async () => {
-    const { forward, seen } = recorder();
-    const empty = { ...config, clientKeys: async () => [] };
-    const response = await handle(at("/v1/models", { headers: { "x-api-key": "anything" } }), empty, forward);
+  it("refuses every API call while CPA has no keys, which CPA alone would let through", async () => {
+    const { forward, seen, probes } = fakeCpa([]);
+    const response = await handle(at("/v1/models", { headers: { "x-api-key": "anything" } }), freshConfig(), forward);
     expect(response.status).toBe(401);
     expect(JSON.stringify(await response.json())).toContain("API Keys in the dashboard");
+    expect(probes).toHaveLength(1);
     expect(seen).toHaveLength(0);
+  });
+
+  it("asks CPA again for every call while it has no keys, so the first key works at once", async () => {
+    const keys: string[] = [];
+    const { forward, seen } = fakeCpa(keys);
+    const guarded = freshConfig();
+    expect((await handle(at("/v1/models", { headers: { "x-api-key": CLIENT_KEY } }), guarded, forward)).status).toBe(401);
+    keys.push(CLIENT_KEY);
+    expect((await handle(at("/v1/models", { headers: { "x-api-key": CLIENT_KEY } }), guarded, forward)).status).toBe(200);
+    expect(seen).toHaveLength(1);
+  });
+
+  it("rechecks CPA after a short while and after any dashboard change", async () => {
+    const keys = [CLIENT_KEY];
+    const { forward, probes } = fakeCpa(keys);
+    let now = NOW;
+    const guarded = freshConfig(() => now);
+    const call = () => handle(at("/v1/models", { headers: { "x-api-key": CLIENT_KEY } }), guarded, forward);
+    await call();
+    await call();
+    expect(probes).toHaveLength(1);
+    now += 15;
+    await call();
+    expect(probes).toHaveLength(2);
+    keys.length = 0;
+    const save = at("/v8/management/config/access/api-keys", { method: "PUT", headers: { cookie: await sessionCookie() }, body: "[]" });
+    expect((await handle(save, guarded, forward)).status).toBe(200);
+    expect((await call()).status).toBe(401);
+    expect(probes).toHaveLength(3);
+  });
+
+  it("fails closed when CPA cannot be asked", async () => {
+    const down: Forward = async () => new Response("starting", { status: 502 });
+    const response = await handle(at("/v1/models", { headers: { "x-api-key": CLIENT_KEY } }), freshConfig(), down);
+    expect(response.status).toBe(503);
+    const thrown: Forward = async () => {
+      throw new Error("container not running");
+    };
+    expect((await handle(at("/v1/models"), freshConfig(), thrown)).status).toBe(503);
   });
 
   it("forwards the health check without a key", async () => {
     const { forward, seen } = recorder();
-    const empty = { ...config, clientKeys: async () => [] };
-    expect((await handle(at("/healthz"), empty, forward)).status).toBe(200);
+    expect((await handle(at("/healthz"), config, forward)).status).toBe(200);
     expect(seen).toHaveLength(1);
   });
 

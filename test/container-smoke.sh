@@ -1,7 +1,7 @@
 #!/bin/sh
 # Builds the CPA image and runs it against the Worker's S3 shim (src/s3.ts) served by Node:
-# management, panel, an API key made through the management API reaching the bucket in the shape
-# the Worker reads (src/client-keys.ts), and the config surviving a restart from the bucket.
+# management, panel, an API key saved the way the dashboard saves it, the open-when-empty behaviour
+# the Worker guards against (src/key-guard.ts), and the config surviving a restart from the bucket.
 set -eu
 
 IMAGE=${IMAGE:-llm-gateway-cpa:test}
@@ -78,15 +78,11 @@ expect 200 "$base/healthz"
 expect 401 "$base/v8/management/config"
 expect 200 -H "$mgmt" "$base/v8/management/config"
 expect 200 "$base/management.html"
-[ "$(curl -s http://127.0.0.1:19000/__client-keys)" = "[]" ] || fail "first boot should start with no API keys"
-echo "ok first boot has no API keys"
-
-expect 200 -X PUT -H "$mgmt" -H "content-type: application/json" -d "[\"$CLIENT_KEY\"]" "$base/v0/management/api-keys"
-wait_for '[ "$(curl -s http://127.0.0.1:19000/__client-keys)" = "[\"$CLIENT_KEY\"]" ]'
-echo "ok a key made in the dashboard reaches the bucket"
+expect 200 -X PUT -H "$mgmt" -H "content-type: application/json" -d "[\"$CLIENT_KEY\"]" "$base/v8/management/config/access/api-keys"
 wait_for '[ "$(status -H "x-api-key: $CLIENT_KEY" "$base/v1/models")" = 200 ]'
+echo "ok a key saved the way the dashboard saves it works"
 expect 401 "$base/v1/models"
-expect 401 -H "x-api-key: wrong-key" "$base/v1/models"
+expect 401 -H "authorization: Bearer probe-0123456789abcdef" "$base/v1/models"
 expect 200 -H "x-api-key: $CLIENT_KEY" "$base/v1/models"
 expect 200 -H "authorization: Bearer $CLIENT_KEY" "$base/v1/models"
 
@@ -100,9 +96,9 @@ expect 200 -H "x-api-key: $CLIENT_KEY" "$base/v1/models"
 expect 401 -H "x-api-key: wrong-key" "$base/v1/models"
 echo "ok config survived a restart from the bucket"
 
-expect 200 -X PUT -H "$mgmt" -H "content-type: application/json" -d "[]" "$base/v0/management/api-keys"
-wait_for '[ "$(curl -s http://127.0.0.1:19000/__client-keys)" = "[]" ]'
-echo "ok removing every key empties the list the Worker checks"
+expect 200 -X PUT -H "$mgmt" -H "content-type: application/json" -d "[]" "$base/v8/management/config/access/api-keys"
+wait_for '[ "$(status -H "authorization: Bearer probe-0123456789abcdef" "$base/v1/models")" = 200 ]'
+echo "ok CPA lets every call through once its key list is empty, so the Worker must refuse"
 
 state=$(curl -s -H "$mgmt" "$base/v0/management/anthropic-auth-url" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')
 [ -n "$state" ] || fail "anthropic-auth-url returned no state"

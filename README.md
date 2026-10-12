@@ -13,7 +13,7 @@ app ──► Worker  llm-gateway.<subdomain>.workers.dev ──► Container: C
 
 - **The real CPA**, built from a pinned upstream commit, with its matching dashboard (`management.html` v1.26.1, checksum-pinned). Not a port: every provider and API CPA supports works the same way.
 - **State in R2 with no keys to create.** CPA saves its config and logins through its S3 object store. Inside the container that store points at `http://r2.internal`, which the Worker intercepts and serves from an R2 binding (`src/s3.ts`). Restarts, sleeps and redeploys keep every login.
-- **Locked down by default.** API keys exist only once you make them in the dashboard; until then every API call is refused. The Worker forwards `/v1/*` and `/v1beta/*` only with a key from that list (read from CPA's config in R2), and CPA checks the key again. CPA on its own lets every request through when its key list is empty, so the Worker refuses instead. The dashboard opens only after a password sign-in (an HMAC-signed, HttpOnly, SameSite=Strict cookie) and still asks for CPA's management key. CPA's own unauthenticated pages, such as its OAuth callbacks, return 404.
+- **Locked down by default.** API keys exist only once you make them in the dashboard; until then every API call is refused. CPA checks every `/v1/*` and `/v1beta/*` call against its key list, but on its own it lets every call through when that list is empty. So before forwarding, the Worker asks CPA with a random key: if CPA accepts it, no keys are set up and the Worker refuses the call; if CPA can't be reached, the Worker refuses too (`src/key-guard.ts`). The dashboard opens only after a password sign-in (an HMAC-signed, HttpOnly, SameSite=Strict cookie) and still asks for CPA's management key. CPA's own unauthenticated pages, such as its OAuth callbacks, return 404.
 - **Cheap when idle.** One `basic` instance (1/4 vCPU, 1 GiB) that sleeps after 30 minutes without requests and wakes on the next one.
 
 ## Deploy
@@ -53,7 +53,7 @@ curl https://llm-gateway.<subdomain>.workers.dev/v1/messages \
   -d '{"model":"claude-sonnet-5-5","max_tokens":64,"messages":[{"role":"user","content":"Say hi"}]}'
 ```
 
-`GET /v1/models` lists the models your logged-in subscriptions offer. Give every app its own key in the dashboard, so removing one cuts off only that app. A key works a few seconds after you add it, once CPA has saved its config to R2.
+`GET /v1/models` lists the models your logged-in subscriptions offer. Give every app its own key in the dashboard, so removing one cuts off only that app. A key works as soon as you save it.
 
 ## Deploy with wrangler instead
 
