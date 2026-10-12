@@ -2,6 +2,7 @@ import { getContainer } from "@cloudflare/containers";
 import type { Env } from "./env.ts";
 import { handle } from "./gateway.ts";
 
+export { ContainerProxy } from "@cloudflare/containers";
 export { Cpa } from "./cpa.ts";
 
 export default {
