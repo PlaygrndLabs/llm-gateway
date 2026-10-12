@@ -93,7 +93,7 @@ To upgrade CPA, change `CPA_COMMIT` in `container/Dockerfile` together with a ma
 - The first request after the container sleeps takes a few seconds while it starts.
 - [Containers pricing](https://developers.cloudflare.com/containers/pricing/). More platforms may follow.
 
-Built on [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI). Not affiliated with [Wei-Shaw/sub2api](https://github.com/Wei-Shaw/sub2api), Anthropic, OpenAI, Google or Cloudflare.
+Built on [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI). Not affiliated with Anthropic, OpenAI, Google or Cloudflare.
 
 ## License
 
