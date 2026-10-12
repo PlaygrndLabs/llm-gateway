@@ -19,7 +19,7 @@
 You need a Cloudflare account on the [Workers Paid plan](https://developers.cloudflare.com/workers/platform/pricing/) ($5/month; Containers require it).
 
 1. Press **Deploy to Cloudflare** above.
-2. Set the two secrets it asks for. Generate each with `openssl rand -hex 32`:
+2. Set the two secrets it asks for. Each needs at least 32 characters of `A-Z a-z 0-9 _ -`; `openssl rand -hex 32` makes one:
    - `DASHBOARD_PASSWORD`: your dashboard sign-in password.
    - `MANAGEMENT_KEY`: CPA's management key, asked for after sign-in.
 3. Open `https://sub2api.<your-subdomain>.workers.dev`, sign in, and create an API key under **API Keys**.
@@ -41,7 +41,14 @@ export ANTHROPIC_BASE_URL=https://sub2api.<your-subdomain>.workers.dev
 export ANTHROPIC_API_KEY=<your gateway API key>
 ```
 
-OpenAI-compatible clients use `<gateway>/v1`, and Gemini clients use `<gateway>/v1beta`, with the same key.
+OpenAI-compatible clients (Codex CLI, OpenAI SDKs, Cursor, and others):
+
+```bash
+export OPENAI_BASE_URL=https://sub2api.<your-subdomain>.workers.dev/v1
+export OPENAI_API_KEY=<your gateway API key>
+```
+
+Gemini clients use `<gateway>/v1beta` with the same key.
 
 ```bash
 curl https://sub2api.<your-subdomain>.workers.dev/v1/messages \
@@ -55,17 +62,30 @@ curl https://sub2api.<your-subdomain>.workers.dev/v1/messages \
 
 ```
 app ──► Worker ──► Durable Object ──► Container: CPA ──► Claude / Codex / Gemini
-         /v1/*        key check           │
-         /login       dashboard sign-in   └─► http://r2.internal ──► R2 bucket
+                   · API key check        │
+                   · dashboard sign-in    └─► http://r2.internal ──► R2 bucket
 ```
 
-A Worker fronts a single CPA container. It refuses API calls until a key exists, puts the dashboard behind a password, and serves CPA's S3 storage from an R2 binding, so you don't have to create storage keys. See [SECURITY.md](SECURITY.md) for the full model.
+The Worker hands every request to one Durable Object in front of the CPA container. The Durable Object refuses API calls until a key exists and keeps the dashboard behind a password. CPA's S3 storage is served from an R2 binding, so you never create storage keys. See [SECURITY.md](SECURITY.md) for the full model.
+
+## Update
+
+A Deploy-button copy redeploys whenever its `main` branch changes. To get the latest release:
+
+```bash
+git pull https://github.com/PlaygrndLabs/sub2api main
+git push
+```
+
+If git refuses because the histories are unrelated, add `--allow-unrelated-histories` to the pull once. Logins and config live in R2, so updates keep them.
 
 <details>
 <summary><b>Deploy with wrangler or GitHub Actions</b></summary>
 
 ```bash
 npm ci
+npx wrangler login
+npx wrangler r2 bucket create sub2api
 npx wrangler deploy        # needs Docker to build the image
 sh scripts/set-secrets.sh  # generates both secrets, stores them, prints them once
 ```
@@ -91,7 +111,8 @@ To upgrade CPA, change `CPA_COMMIT` in `container/Dockerfile` together with a ma
 
 - Requests reach providers from Cloudflare's network. **Check that your provider's terms allow how you use your subscription.**
 - The first request after the container sleeps takes a few seconds while it starts.
-- [Containers pricing](https://developers.cloudflare.com/containers/pricing/). More platforms may follow.
+- Cost is the $5 Workers Paid plan plus container time while awake. See [Containers pricing](https://developers.cloudflare.com/containers/pricing/).
+- Lost the management key? Set a new `MANAGEMENT_KEY` secret, delete `config/config.yaml` from the `sub2api` R2 bucket, and redeploy. CPA starts with a fresh config. Provider logins stay, but you recreate your app API keys.
 
 Built on [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI). Not affiliated with Anthropic, OpenAI, Google or Cloudflare.
 
