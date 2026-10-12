@@ -9,6 +9,7 @@ function probeKey(): string {
 
 export class KeyGuard {
   private requiredSince: number | null = null;
+  private uncachedUntil = 0;
 
   constructor(private readonly nowSeconds: () => number) {}
 
@@ -21,13 +22,16 @@ export class KeyGuard {
     await response?.body?.cancel();
     if (response === null) return "unavailable";
     if (response.status === 401 || response.status === 403) {
-      this.requiredSince = now;
+      if (now >= this.uncachedUntil) this.requiredSince = now;
       return "required";
     }
     return response.ok ? "open" : "unavailable";
   }
 
+  // Called around every dashboard write: CPA may apply a key change after its answer, so no
+  // "required" answer is trusted again until the window has passed.
   forget(): void {
     this.requiredSince = null;
+    this.uncachedUntil = this.nowSeconds() + REQUIRED_SECONDS;
   }
 }

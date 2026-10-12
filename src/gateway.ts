@@ -5,16 +5,22 @@ import { loginPage, messagePage } from "./login-page.ts";
 
 export type Forward = (request: Request) => Promise<Response>;
 
+export interface LoginLimiter {
+  limit(options: { key: string }): Promise<{ success: boolean }>;
+}
+
 export interface GatewayConfig {
   readonly dashboardPassword: string;
   readonly nowSeconds: () => number;
   readonly keyGuard: KeyGuard;
+  readonly loginLimiter: LoginLimiter;
 }
 
 const MAX_LOGIN_BODY = 4096;
 export const MIN_PASSWORD_LENGTH = 16;
 const NO_CLIENT_KEYS = "No API key is set up yet: add one under API Keys in the dashboard.";
 const CPA_UNAVAILABLE = "The gateway is starting or unavailable. Try again shortly.";
+const TOO_MANY_ATTEMPTS = "Too many sign-in attempts. Wait a minute and try again.";
 const PASSWORD_NOT_SET = `Sign-in is off: set the DASHBOARD_PASSWORD secret to at least ${MIN_PASSWORD_LENGTH} characters.`;
 
 function redirect(location: string, headers: HeadersInit = {}): Response {
@@ -59,8 +65,10 @@ async function api(request: Request, url: URL, config: GatewayConfig, forward: F
 }
 
 async function dashboard(request: Request, config: GatewayConfig, forward: Forward): Promise<Response> {
+  const writes = request.method !== "GET" && request.method !== "HEAD";
+  if (writes) config.keyGuard.forget();
   const response = await forward(withoutCookies(request));
-  if (request.method !== "GET" && request.method !== "HEAD") config.keyGuard.forget();
+  if (writes) config.keyGuard.forget();
   return response;
 }
 
@@ -89,6 +97,8 @@ async function login(request: Request, config: GatewayConfig): Promise<Response>
   if (config.dashboardPassword.length < MIN_PASSWORD_LENGTH) return html(loginPage(PASSWORD_NOT_SET), 503);
   const length = Number(request.headers.get("content-length") ?? "0");
   if (!Number.isFinite(length) || length > MAX_LOGIN_BODY) return html(loginPage("Request too large."), 413);
+  const client = request.headers.get("cf-connecting-ip") ?? "unknown";
+  if (!(await config.loginLimiter.limit({ key: client })).success) return html(loginPage(TOO_MANY_ATTEMPTS), 429);
   const form = await request.formData().catch(() => null);
   const password = form?.get("password");
   if (typeof password !== "string" || !(await passwordMatches(password, config.dashboardPassword))) {
