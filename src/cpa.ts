@@ -23,7 +23,7 @@ export class Cpa extends Container<Env> {
       OBJECTSTORE_BUCKET: STATE_BUCKET,
       OBJECTSTORE_ACCESS_KEY: "r2-binding",
       OBJECTSTORE_SECRET_KEY: "r2-binding",
-      CPA_MANAGEMENT_KEY: env.MANAGEMENT_KEY,
+      CPA_MANAGEMENT_KEY: env.MANAGEMENT_KEY ?? "",
     };
   }
 
@@ -31,7 +31,7 @@ export class Cpa extends Container<Env> {
     return handle(
       request,
       {
-        dashboardPassword: this.env.DASHBOARD_PASSWORD,
+        dashboardPassword: this.env.DASHBOARD_PASSWORD ?? "",
         nowSeconds,
         keyGuard: this.keyGuard,
         loginLimiter: this.env.LOGIN_LIMIT,
