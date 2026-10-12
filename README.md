@@ -1,9 +1,9 @@
-# LLM Gateway: CLIProxyAPI on Cloudflare in one click
+# sub2api: a Cloudflare-based LLM gateway and proxy server
 
-**Turn your Claude, ChatGPT Codex and Gemini subscriptions into your own private API, hosted on Cloudflare.** One click deploys [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) (CPA) to Cloudflare Workers and Containers. Point Claude Code, the Anthropic or OpenAI SDKs, or any app at your gateway URL and use your subscription from anywhere, with no server or home machine left running.
+**Literally the [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) (CPA) project, deployed as a Cloudflare Worker in one click.** Turn your Claude, ChatGPT Codex and Gemini subscriptions into your own private API. Point Claude Code, the Anthropic or OpenAI SDKs, or any app at your gateway URL and use your subscription from anywhere, with no server or home machine left running.
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/PlaygrndLabs/llm-gateway)
-[![ci](https://github.com/PlaygrndLabs/llm-gateway/actions/workflows/ci.yml/badge.svg)](https://github.com/PlaygrndLabs/llm-gateway/actions/workflows/ci.yml)
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/PlaygrndLabs/sub2api)
+[![ci](https://github.com/PlaygrndLabs/sub2api/actions/workflows/ci.yml/badge.svg)](https://github.com/PlaygrndLabs/sub2api/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## Why
@@ -22,7 +22,7 @@ You need a Cloudflare account on the [Workers Paid plan](https://developers.clou
 2. Set the two secrets it asks for. Generate each with `openssl rand -hex 32`:
    - `DASHBOARD_PASSWORD`: your dashboard sign-in password.
    - `MANAGEMENT_KEY`: CPA's management key, asked for after sign-in.
-3. Open `https://llm-gateway.<your-subdomain>.workers.dev`, sign in, and create an API key under **API Keys**.
+3. Open `https://sub2api.<your-subdomain>.workers.dev`, sign in, and create an API key under **API Keys**.
 
 ## Connect a subscription
 
@@ -37,14 +37,14 @@ CPA stores the login and refreshes its tokens on its own.
 Claude Code, the Claude Agent SDK and the Anthropic SDKs:
 
 ```bash
-export ANTHROPIC_BASE_URL=https://llm-gateway.<your-subdomain>.workers.dev
+export ANTHROPIC_BASE_URL=https://sub2api.<your-subdomain>.workers.dev
 export ANTHROPIC_API_KEY=<your gateway API key>
 ```
 
 OpenAI-compatible clients use `<gateway>/v1`, and Gemini clients use `<gateway>/v1beta`, with the same key.
 
 ```bash
-curl https://llm-gateway.<your-subdomain>.workers.dev/v1/messages \
+curl https://sub2api.<your-subdomain>.workers.dev/v1/messages \
   -H "x-api-key: $ANTHROPIC_API_KEY" -H "anthropic-version: 2023-06-01" -H "content-type: application/json" \
   -d '{"model":"claude-sonnet-5-5","max_tokens":64,"messages":[{"role":"user","content":"Say hi"}]}'
 ```
@@ -93,7 +93,7 @@ To upgrade CPA, change `CPA_COMMIT` in `container/Dockerfile` together with a ma
 - The first request after the container sleeps takes a few seconds while it starts.
 - [Containers pricing](https://developers.cloudflare.com/containers/pricing/). More platforms may follow.
 
-Built on [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI). Not affiliated with Anthropic, OpenAI, Google or Cloudflare.
+Built on [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI). Not affiliated with [Wei-Shaw/sub2api](https://github.com/Wei-Shaw/sub2api), Anthropic, OpenAI, Google or Cloudflare.
 
 ## License
 

@@ -2,7 +2,7 @@
 
 ## Reporting a vulnerability
 
-Please report privately through [GitHub's private vulnerability reporting](https://github.com/PlaygrndLabs/llm-gateway/security/advisories/new). Don't open a public issue. We aim to reply within a week.
+Please report privately through [GitHub's private vulnerability reporting](https://github.com/PlaygrndLabs/sub2api/security/advisories/new). Don't open a public issue. We aim to reply within a week.
 
 Bugs in CPA itself belong upstream at [router-for-me/CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI).
 

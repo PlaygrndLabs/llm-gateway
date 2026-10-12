@@ -4,7 +4,7 @@ export const SESSION_SECONDS = 12 * 60 * 60;
 const encoder = new TextEncoder();
 
 async function sessionKey(password: string): Promise<CryptoKey> {
-  const material = await crypto.subtle.digest("SHA-256", encoder.encode(`llm-gateway session v1\0${password}`));
+  const material = await crypto.subtle.digest("SHA-256", encoder.encode(`sub2api session v1\0${password}`));
   return crypto.subtle.importKey("raw", material, { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
 }
 

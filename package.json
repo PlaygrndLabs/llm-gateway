@@ -1,14 +1,14 @@
 {
-  "name": "llm-gateway",
-  "description": "Deploy CLIProxyAPI (CPA) to Cloudflare in one click: your Claude, Codex and Gemini subscriptions as a private API, on Workers and Containers with state in R2.",
+  "name": "sub2api",
+  "description": "A Cloudflare-based LLM gateway and proxy server: the CLIProxyAPI (CPA) project deployed as a Cloudflare Worker in one click.",
   "license": "MIT",
-  "homepage": "https://github.com/PlaygrndLabs/llm-gateway#readme",
+  "homepage": "https://github.com/PlaygrndLabs/sub2api#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/PlaygrndLabs/llm-gateway.git"
+    "url": "git+https://github.com/PlaygrndLabs/sub2api.git"
   },
   "bugs": {
-    "url": "https://github.com/PlaygrndLabs/llm-gateway/issues"
+    "url": "https://github.com/PlaygrndLabs/sub2api/issues"
   },
   "keywords": [
     "cliproxyapi",
@@ -17,6 +17,7 @@
     "cloudflare-containers",
     "claude-code",
     "llm-gateway",
+    "llm-proxy",
     "ai-gateway",
     "openai-compatible",
     "anthropic",

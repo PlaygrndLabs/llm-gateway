@@ -45,8 +45,8 @@ jobs:
       - name: Create the R2 bucket if it is missing
         if: steps.creds.outputs.ready == 'true'
         run: |
-          if ! npx wrangler r2 bucket info llm-gateway >/dev/null 2>&1; then
-            npx wrangler r2 bucket create llm-gateway
+          if ! npx wrangler r2 bucket info sub2api >/dev/null 2>&1; then
+            npx wrangler r2 bucket create sub2api
           fi
       - if: steps.creds.outputs.ready == 'true'
         run: npx wrangler deploy

@@ -4,9 +4,9 @@
 # the Worker guards against (src/key-guard.ts), and the config surviving a restart from the bucket.
 set -eu
 
-IMAGE=${IMAGE:-llm-gateway-cpa:test}
+IMAGE=${IMAGE:-sub2api-cpa:test}
 NODE_IMAGE=node:24-alpine
-NET=llm-gateway-smoke
+NET=sub2api-smoke
 PORT=18317
 CLIENT_KEY=client-key-0123456789abcdef0123456789abcdef
 MANAGEMENT_KEY=management-key-0123456789abcdef0123456789ab

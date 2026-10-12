@@ -5,7 +5,7 @@ function escapeHtml(text: string): string {
 export function loginPage(error: string | null): string {
   const message = error === null ? "" : `<p class="error">${escapeHtml(error)}</p>`;
   return page(`<form method="post" action="/login">
-  <h1>LLM Gateway</h1>
+  <h1>sub2api</h1>
   <p>Sign in to open the CPA dashboard.</p>
   ${message}
   <input type="password" name="password" autocomplete="current-password" placeholder="Dashboard password" required autofocus>
@@ -27,7 +27,7 @@ function page(content: string): string {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>LLM Gateway</title>
+<title>sub2api</title>
 <style>
   :root { color-scheme: light dark; --bg: #f6f6f4; --card: #fff; --text: #1d1d1b; --muted: #6b6b66; --line: #d9d9d4; --accent: #2f5bd3; --error: #b3261e; }
   @media (prefers-color-scheme: dark) { :root { --bg: #151514; --card: #1f1f1d; --text: #ededea; --muted: #a3a39d; --line: #3a3a36; --accent: #8aa8ff; --error: #ff8a80; } }
