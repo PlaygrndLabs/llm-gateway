@@ -103,3 +103,9 @@ echo "ok config survived a restart from the bucket"
 expect 200 -X PUT -H "$mgmt" -H "content-type: application/json" -d "[]" "$base/v0/management/api-keys"
 wait_for '[ "$(curl -s http://127.0.0.1:19000/__client-keys)" = "[]" ]'
 echo "ok removing every key empties the list the Worker checks"
+
+state=$(curl -s -H "$mgmt" "$base/v0/management/anthropic-auth-url" | sed -n 's/.*"state":"\([^"]*\)".*/\1/p')
+[ -n "$state" ] || fail "anthropic-auth-url returned no state"
+expect 200 "$base/v0/management/oauth-callback?code=smoke-code&state=$state"
+expect 404 "$base/v0/management/oauth-callback?code=smoke-code&state=0123456789abcdef0123456789abcdef"
+echo "ok CPA takes a pasted callback by its state alone"
