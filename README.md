@@ -1,10 +1,11 @@
 # sub2api: a Cloudflare-based LLM gateway and proxy server
 
+[![ci](https://github.com/PlaygrndLabs/sub2api/actions/workflows/ci.yml/badge.svg)](https://github.com/PlaygrndLabs/sub2api/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 **Literally the [CLIProxyAPI](https://github.com/router-for-me/CLIProxyAPI) (CPA) project, deployed as a Cloudflare Worker in one click.** Turn your Claude, ChatGPT Codex and Gemini subscriptions into your own private API. Point Claude Code, the Anthropic or OpenAI SDKs, or any app at your gateway URL and use your subscription from anywhere, with no server or home machine left running.
 
 [![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/PlaygrndLabs/sub2api)
-[![ci](https://github.com/PlaygrndLabs/sub2api/actions/workflows/ci.yml/badge.svg)](https://github.com/PlaygrndLabs/sub2api/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ## Why
 
