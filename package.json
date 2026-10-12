@@ -1,6 +1,30 @@
 {
-  "name": "llm-gateway",
-  "description": "One-shot CLIProxyAPI on Cloudflare: your subscription logins as an API from a Worker and a Container, state in R2.",
+  "name": "sub2api",
+  "description": "A Cloudflare-based LLM gateway and proxy server: the CLIProxyAPI (CPA) project deployed as a Cloudflare Worker in one click.",
+  "license": "MIT",
+  "homepage": "https://github.com/PlaygrndLabs/sub2api#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/PlaygrndLabs/sub2api.git"
+  },
+  "bugs": {
+    "url": "https://github.com/PlaygrndLabs/sub2api/issues"
+  },
+  "keywords": [
+    "cliproxyapi",
+    "cpa",
+    "cloudflare-workers",
+    "cloudflare-containers",
+    "claude-code",
+    "llm-gateway",
+    "llm-proxy",
+    "ai-gateway",
+    "openai-compatible",
+    "anthropic",
+    "codex",
+    "gemini",
+    "self-hosted"
+  ],
   "private": true,
   "type": "module",
   "scripts": {

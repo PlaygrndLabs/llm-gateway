@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { handle, type Forward, type GatewayConfig } from "../src/gateway.ts";
+import { handle, type Forward, type GatewayConfig, type LoginLimiter } from "../src/gateway.ts";
 import { KeyGuard } from "../src/key-guard.ts";
 import { classify } from "../src/routes.ts";
 import { SESSION_COOKIE, issueSession, passwordMatches, readCookie, sessionIsValid } from "../src/session.ts";
@@ -8,8 +8,10 @@ const PASSWORD = "correct-horse-battery-staple-0123456789";
 const NOW = 1_800_000_000;
 const CLIENT_KEY = "client-key-0123456789abcdef0123456789abcdef";
 
+const unlimited: LoginLimiter = { limit: async () => ({ success: true }) };
+
 function freshConfig(nowSeconds: () => number = () => NOW): GatewayConfig {
-  return { dashboardPassword: PASSWORD, nowSeconds, keyGuard: new KeyGuard(nowSeconds) };
+  return { dashboardPassword: PASSWORD, nowSeconds, keyGuard: new KeyGuard(nowSeconds), loginLimiter: unlimited };
 }
 
 const config = freshConfig();
@@ -179,6 +181,25 @@ describe("handle", () => {
     expect(probes).toHaveLength(3);
   });
 
+  it("trusts no cached answer for a while after a dashboard change, in case CPA applies it late", async () => {
+    const keys = [CLIENT_KEY];
+    const { forward, probes } = fakeCpa(keys);
+    let now = NOW;
+    const guarded = freshConfig(() => now);
+    const call = () => handle(at("/v1/models", { headers: { "x-api-key": CLIENT_KEY } }), guarded, forward);
+    const save = at("/v8/management/config/access/api-keys", { method: "PUT", headers: { cookie: await sessionCookie() }, body: "[]" });
+    await handle(save, guarded, forward);
+    expect((await call()).status).toBe(200);
+    keys.length = 0;
+    expect((await call()).status).toBe(401);
+    expect(probes).toHaveLength(2);
+    keys.push(CLIENT_KEY);
+    now += 15;
+    await call();
+    await call();
+    expect(probes).toHaveLength(3);
+  });
+
   it("fails closed when CPA cannot be asked", async () => {
     const down: Forward = async () => new Response("starting", { status: 502 });
     const response = await handle(at("/v1/models", { headers: { "x-api-key": CLIENT_KEY } }), freshConfig(), down);
@@ -277,6 +298,20 @@ describe("handle", () => {
     expect(response.status).toBe(401);
     expect(response.headers.get("set-cookie")).toBeNull();
     expect(await response.text()).toContain("Wrong password.");
+  });
+
+  it("limits sign-in attempts per client address", async () => {
+    const { forward } = recorder();
+    const seen: string[] = [];
+    const limited = { ...config, loginLimiter: { limit: async ({ key }: { key: string }) => ({ success: seen.push(key) <= 1 }) } };
+    const attempt = () =>
+      handle(at("/login", { method: "POST", headers: { "cf-connecting-ip": "203.0.113.7" }, body: new URLSearchParams({ password: PASSWORD }) }), limited, forward);
+    expect((await attempt()).status).toBe(303);
+    const blocked = await attempt();
+    expect(blocked.status).toBe(429);
+    expect(blocked.headers.get("set-cookie")).toBeNull();
+    expect(await blocked.text()).toContain("Too many sign-in attempts");
+    expect(seen).toEqual(["203.0.113.7", "203.0.113.7"]);
   });
 
   it("turns sign-in off while the dashboard password is missing or short", async () => {
