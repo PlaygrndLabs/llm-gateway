@@ -5,7 +5,8 @@ import { SESSION_COOKIE, issueSession, passwordMatches, readCookie, sessionIsVal
 
 const PASSWORD = "correct-horse-battery-staple-0123456789";
 const NOW = 1_800_000_000;
-const config = { dashboardPassword: PASSWORD, nowSeconds: () => NOW };
+const CLIENT_KEY = "client-key-0123456789abcdef0123456789abcdef";
+const config = { dashboardPassword: PASSWORD, nowSeconds: () => NOW, clientKeys: async () => [CLIENT_KEY] };
 
 function recorder(): { forward: Forward; seen: Request[] } {
   const seen: Request[] = [];
@@ -32,7 +33,7 @@ describe("classify", () => {
     ["/v1/messages/count_tokens", "api"],
     ["/v1/chat/completions", "api"],
     ["/v1beta/models", "api"],
-    ["/healthz", "api"],
+    ["/healthz", "health"],
     ["/management.html", "dashboard"],
     ["/v0/management/config", "dashboard"],
     ["/v8/management/oauth/auth-url", "dashboard"],
@@ -89,15 +90,53 @@ describe("handle", () => {
   it("forwards API calls to CPA without the browser's cookies", async () => {
     const { forward, seen } = recorder();
     const response = await handle(
-      at("/v1/messages", { method: "POST", headers: { "x-api-key": "client-key", cookie: await sessionCookie() }, body: "{}" }),
+      at("/v1/messages", { method: "POST", headers: { "x-api-key": CLIENT_KEY, cookie: await sessionCookie() }, body: "{}" }),
       config,
       forward,
     );
     expect(response.status).toBe(200);
     expect(seen).toHaveLength(1);
-    expect(seen[0]?.headers.get("x-api-key")).toBe("client-key");
+    expect(seen[0]?.headers.get("x-api-key")).toBe(CLIENT_KEY);
     expect(seen[0]?.headers.get("cookie")).toBeNull();
     expect(await seen[0]?.text()).toBe("{}");
+  });
+
+  it("accepts the key wherever CPA reads it", async () => {
+    const { forward, seen } = recorder();
+    const requests = [
+      at("/v1/models", { headers: { authorization: `Bearer ${CLIENT_KEY}` } }),
+      at("/v1/models", { headers: { authorization: `bearer  ${CLIENT_KEY} ` } }),
+      at("/v1/models", { headers: { authorization: CLIENT_KEY } }),
+      at("/v1beta/models", { headers: { "x-goog-api-key": CLIENT_KEY } }),
+      at(`/v1beta/models?key=${CLIENT_KEY}`),
+      at(`/v1/models?auth_token=${CLIENT_KEY}`),
+    ];
+    for (const request of requests) expect((await handle(request, config, forward)).status).toBe(200);
+    expect(seen).toHaveLength(requests.length);
+  });
+
+  it("refuses API calls without a key the dashboard made", async () => {
+    const { forward, seen } = recorder();
+    expect((await handle(at("/v1/models"), config, forward)).status).toBe(401);
+    expect((await handle(at("/v1/models", { headers: { "x-api-key": "guess" } }), config, forward)).status).toBe(401);
+    expect((await handle(at("/v1/models", { headers: { authorization: "Basic abc" } }), config, forward)).status).toBe(401);
+    expect(seen).toHaveLength(0);
+  });
+
+  it("refuses every API call while the dashboard has no keys, which CPA alone would let through", async () => {
+    const { forward, seen } = recorder();
+    const empty = { ...config, clientKeys: async () => [] };
+    const response = await handle(at("/v1/models", { headers: { "x-api-key": "anything" } }), empty, forward);
+    expect(response.status).toBe(401);
+    expect(JSON.stringify(await response.json())).toContain("API Keys in the dashboard");
+    expect(seen).toHaveLength(0);
+  });
+
+  it("forwards the health check without a key", async () => {
+    const { forward, seen } = recorder();
+    const empty = { ...config, clientKeys: async () => [] };
+    expect((await handle(at("/healthz"), empty, forward)).status).toBe(200);
+    expect(seen).toHaveLength(1);
   });
 
   it("never forwards blocked paths", async () => {
@@ -155,7 +194,7 @@ describe("handle", () => {
 
   it("turns sign-in off while the dashboard password is missing or short", async () => {
     const { forward } = recorder();
-    const weak = { dashboardPassword: "short", nowSeconds: () => NOW };
+    const weak = { ...config, dashboardPassword: "short" };
     const form = await handle(at("/login"), weak, forward);
     expect(await form.text()).toContain("Sign-in is off");
     const attempt = await handle(at("/login", { method: "POST", body: new URLSearchParams({ password: "short" }) }), weak, forward);

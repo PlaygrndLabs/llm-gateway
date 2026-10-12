@@ -3,7 +3,7 @@
 # CPA only uses this file when the bucket has no config yet; after that the bucket copy wins.
 set -eu
 
-for name in OBJECTSTORE_ENDPOINT OBJECTSTORE_BUCKET OBJECTSTORE_ACCESS_KEY OBJECTSTORE_SECRET_KEY CPA_MANAGEMENT_KEY CPA_CLIENT_KEY; do
+for name in OBJECTSTORE_ENDPOINT OBJECTSTORE_BUCKET OBJECTSTORE_ACCESS_KEY OBJECTSTORE_SECRET_KEY CPA_MANAGEMENT_KEY; do
   eval "value=\${$name:-}"
   if [ -z "$value" ]; then
     echo "entrypoint: $name is not set" >&2
@@ -11,13 +11,10 @@ for name in OBJECTSTORE_ENDPOINT OBJECTSTORE_BUCKET OBJECTSTORE_ACCESS_KEY OBJEC
   fi
 done
 
-for name in CPA_MANAGEMENT_KEY CPA_CLIENT_KEY; do
-  eval "value=\${$name}"
-  if ! printf '%s' "$value" | grep -Eq '^[A-Za-z0-9_-]{32,}$'; then
-    echo "entrypoint: $name must be at least 32 characters of A-Z a-z 0-9 _ -" >&2
-    exit 64
-  fi
-done
+if ! printf '%s' "$CPA_MANAGEMENT_KEY" | grep -Eq '^[A-Za-z0-9_-]{32,}$'; then
+  echo "entrypoint: CPA_MANAGEMENT_KEY must be at least 32 characters of A-Z a-z 0-9 _ -" >&2
+  exit 64
+fi
 
 cat > /CLIProxyAPI/config.example.yaml <<EOF
 config-version: 8
@@ -30,8 +27,7 @@ management:
   disable-control-panel: false
   disable-auto-update-panel: true
 access:
-  api-keys:
-    - "${CPA_CLIENT_KEY}"
+  api-keys: []
 routing:
   retry:
     request-retry: 1
@@ -45,5 +41,5 @@ observability:
 EOF
 chmod 600 /CLIProxyAPI/config.example.yaml
 
-unset CPA_MANAGEMENT_KEY CPA_CLIENT_KEY
+unset CPA_MANAGEMENT_KEY
 exec /CLIProxyAPI/CLIProxyAPI

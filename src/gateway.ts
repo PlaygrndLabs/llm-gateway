@@ -1,3 +1,4 @@
+import { keyIsAllowed } from "./client-keys.ts";
 import { classify } from "./routes.ts";
 import { SESSION_COOKIE, SESSION_SECONDS, issueSession, passwordMatches, readCookie, sessionIsValid } from "./session.ts";
 import { loginPage } from "./login-page.ts";
@@ -7,10 +8,12 @@ export type Forward = (request: Request) => Promise<Response>;
 export interface GatewayConfig {
   readonly dashboardPassword: string;
   readonly nowSeconds: () => number;
+  readonly clientKeys: () => Promise<string[]>;
 }
 
 const MAX_LOGIN_BODY = 4096;
 export const MIN_PASSWORD_LENGTH = 16;
+const NO_CLIENT_KEYS = "No API key is set up yet: add one under API Keys in the dashboard.";
 const PASSWORD_NOT_SET = `Sign-in is off: set the DASHBOARD_PASSWORD secret to at least ${MIN_PASSWORD_LENGTH} characters.`;
 
 function redirect(location: string, headers: HeadersInit = {}): Response {
@@ -39,6 +42,15 @@ function withoutCookies(request: Request): Request {
   return new Request(request, { headers });
 }
 
+async function api(request: Request, config: GatewayConfig, forward: Forward): Promise<Response> {
+  const allowed = await config.clientKeys();
+  if (allowed.length === 0) return Response.json({ error: { type: "authentication_error", message: NO_CLIENT_KEYS } }, { status: 401 });
+  if (!(await keyIsAllowed(request, allowed))) {
+    return Response.json({ error: { type: "authentication_error", message: "Invalid API key." } }, { status: 401 });
+  }
+  return forward(withoutCookies(request));
+}
+
 async function signedIn(request: Request, config: GatewayConfig): Promise<boolean> {
   if (config.dashboardPassword.length < MIN_PASSWORD_LENGTH) return false;
   const token = readCookie(request.headers.get("cookie"), SESSION_COOKIE);
@@ -64,6 +76,8 @@ export async function handle(request: Request, config: GatewayConfig, forward: F
   const url = new URL(request.url);
   switch (classify(url.pathname)) {
     case "api":
+      return api(request, config, forward);
+    case "health":
       return forward(withoutCookies(request));
     case "home":
       return redirect((await signedIn(request, config)) ? "/management.html" : "/login");

@@ -1,4 +1,4 @@
-export type Route = "api" | "dashboard" | "home" | "login" | "logout" | "blocked";
+export type Route = "api" | "health" | "dashboard" | "home" | "login" | "logout" | "blocked";
 
 const API_PREFIXES = ["/v1/", "/v1beta/"];
 const DASHBOARD_PREFIXES = ["/v0/management/", "/v8/management/"];
@@ -9,7 +9,8 @@ export function classify(pathname: string): Route {
   if (pathname === "/") return "home";
   if (pathname === "/login") return "login";
   if (pathname === "/logout") return "logout";
-  if (pathname === "/healthz" || API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return "api";
+  if (pathname === "/healthz") return "health";
+  if (API_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return "api";
   if (pathname === "/management.html" || DASHBOARD_PREFIXES.some((prefix) => pathname.startsWith(prefix))) return "dashboard";
   return "blocked";
 }
