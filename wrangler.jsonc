@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "llm-gateway",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-10-01",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "vars": {
+    "R2_BUCKET": "llm-gateway"
+  },
+  "containers": [
+    {
+      "class_name": "Cpa",
+      "image": "./container/Dockerfile",
+      "image_build_context": "./container",
+      "instance_type": "basic",
+      "max_instances": 1
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "name": "CPA", "class_name": "Cpa" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Cpa"] }]
+}
