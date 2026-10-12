@@ -14,7 +14,7 @@ ARG PANEL_SHA256=32d835ee74ac9241e3b975567a1d6c24a64627931679dc616721fe5271dfca3
 RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl tzdata \
   && rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /panel \
-  && curl -fsSL -o /panel/management.html \
+  && curl -fsSL --retry 5 --retry-all-errors -o /panel/management.html \
     "https://github.com/router-for-me/Cli-Proxy-API-Management-Center/releases/download/${PANEL_VERSION}/management.html" \
   && echo "${PANEL_SHA256}  /panel/management.html" | sha256sum -c -
 WORKDIR /CLIProxyAPI
