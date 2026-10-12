@@ -1,10 +1,13 @@
 import { getContainer } from "@cloudflare/containers";
-import { CONFIG_OBJECT_KEY, parseClientKeys } from "./client-keys.ts";
 import type { Env } from "./env.ts";
 import { handle } from "./gateway.ts";
+import { KeyGuard } from "./key-guard.ts";
 
 export { ContainerProxy } from "@cloudflare/containers";
 export { Cpa } from "./cpa.ts";
+
+const nowSeconds = () => Math.floor(Date.now() / 1000);
+const keyGuard = new KeyGuard(nowSeconds);
 
 export default {
   fetch(request, env) {
@@ -13,11 +16,8 @@ export default {
       request,
       {
         dashboardPassword: env.DASHBOARD_PASSWORD,
-        nowSeconds: () => Math.floor(Date.now() / 1000),
-        clientKeys: async () => {
-          const config = await env.STATE.get(CONFIG_OBJECT_KEY);
-          return config === null ? [] : parseClientKeys(await config.text());
-        },
+        nowSeconds,
+        keyGuard,
       },
       (forwarded) => cpa.fetch(forwarded),
     );

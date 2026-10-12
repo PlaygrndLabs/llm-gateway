@@ -1,5 +1,4 @@
 import { createServer } from "node:http";
-import { CONFIG_OBJECT_KEY, parseClientKeys } from "../src/client-keys.ts";
 import { handleS3 } from "../src/s3.ts";
 import { MemoryStore } from "./memory-store.ts";
 
@@ -13,13 +12,6 @@ createServer(async (incoming, outgoing) => {
   if (incoming.url === "/__keys") {
     outgoing.writeHead(200, { "content-type": "application/json" });
     outgoing.end(JSON.stringify([...store.entries.keys()].sort()));
-    return;
-  }
-  if (incoming.url === "/__client-keys") {
-    const config = await store.get(CONFIG_OBJECT_KEY);
-    const keys = config === null ? [] : parseClientKeys(new TextDecoder().decode(await config.arrayBuffer()));
-    outgoing.writeHead(200, { "content-type": "application/json" });
-    outgoing.end(JSON.stringify(keys));
     return;
   }
   const headers = new Headers();
